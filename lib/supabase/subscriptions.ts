@@ -1,41 +1,95 @@
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
-async function getSessionUser() {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.user || null;
-}
-
-export async function getSubscriptions() {
-  const user = await getSessionUser();
-
-  if (!user) return [];
-
-  const { data } = await supabase
+export async function getSubscription(userId: string) {
+  const { data, error } = await supabaseAdmin
     .from("subscriptions")
     .select("*")
-    .eq("user_id", user.id);
+    .eq("user_id", userId)
+    .maybeSingle();
 
-  return data || [];
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
 }
 
-export async function createSubscription(subscription: {
-  plan: string;
+export async function createSubscription({
+  userId,
+  stripeCustomerId,
+  stripeSubscriptionId,
+  status,
+  plan,
+  credits,
+  currentPeriodEnd,
+}: {
+  userId: string;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
   status: string;
+  plan: string;
+  credits: number;
+  currentPeriodEnd?: string | null;
 }) {
-  const user = await getSessionUser();
-
-  if (!user) throw new Error("User not logged in");
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("subscriptions")
-    .insert({
-      ...subscription,
-      user_id: user.id,
-    })
+    .upsert(
+      {
+        user_id: userId,
+        stripe_customer_id: stripeCustomerId,
+        stripe_subscription_id: stripeSubscriptionId,
+        status,
+        plan,
+        credits,
+        current_period_end: currentPeriodEnd,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "user_id",
+      }
+    )
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+export async function updateSubscription({
+  userId,
+  status,
+  plan,
+  credits,
+  currentPeriodEnd,
+}: {
+  userId: string;
+  status: string;
+  plan?: string;
+  credits?: number;
+  currentPeriodEnd?: string | null;
+}) {
+  const updateData: Record<string, string | number | null> = {
+    status,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (plan) updateData.plan = plan;
+  if (typeof credits === "number") updateData.credits = credits;
+  if (currentPeriodEnd) updateData.current_period_end = currentPeriodEnd;
+
+  const { data, error } = await supabaseAdmin
+    .from("subscriptions")
+    .update(updateData)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
 
   return data;
 }
