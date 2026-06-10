@@ -1,12 +1,17 @@
-"use client";
-
 import Link from "next/link";
 import { CheckCircle } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 
-export default function BillingSuccessPage() {
-  const searchParams = useSearchParams();
-  const sessionId = searchParams.get("session_id");
+type BillingSuccessPageProps = {
+  searchParams?: Promise<{
+    session_id?: string;
+  }>;
+};
+
+export default async function BillingSuccessPage({
+  searchParams,
+}: BillingSuccessPageProps) {
+  const params = await searchParams;
+  const sessionId = params?.session_id;
 
   return (
     <main className="flex min-h-[70vh] items-center justify-center p-6 text-white">
