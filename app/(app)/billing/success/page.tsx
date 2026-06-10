@@ -1,31 +1,36 @@
+"use client";
+
 import Link from "next/link";
+import { CheckCircle } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 export default function BillingSuccessPage() {
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get("session_id");
+
   return (
-    <main className="p-6 text-white">
-      <div className="max-w-2xl rounded-2xl border border-white/10 bg-white/[0.03] p-8">
-        <h1 className="text-3xl font-bold">Payment Successful</h1>
+    <main className="flex min-h-[70vh] items-center justify-center p-6 text-white">
+      <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-white/[0.03] p-10 text-center">
+        <CheckCircle className="mx-auto h-20 w-20 text-green-400" />
+
+        <h1 className="mt-6 text-4xl font-bold">Subscription Activated</h1>
 
         <p className="mt-4 text-white/60">
-          Your payment was accepted. Stripe will send a webhook to update your
-          subscription in Supabase.
+          Your CineForge AI subscription is active. Your account is ready to use.
         </p>
 
-        <div className="mt-6 flex gap-3">
-          <Link
-            href="/subscription"
-            className="rounded-xl bg-white px-5 py-3 font-medium text-black"
-          >
-            View Subscription
-          </Link>
+        {sessionId && (
+          <p className="mt-4 break-all rounded-xl bg-black p-4 text-sm text-white/40">
+            Session ID: {sessionId}
+          </p>
+        )}
 
-          <Link
-            href="/dashboard"
-            className="rounded-xl border border-white/10 px-5 py-3 text-white"
-          >
-            Dashboard
-          </Link>
-        </div>
+        <Link
+          href="/dashboard"
+          className="mt-8 inline-block rounded-xl bg-white px-6 py-3 font-semibold text-black"
+        >
+          Go To Dashboard
+        </Link>
       </div>
     </main>
   );
