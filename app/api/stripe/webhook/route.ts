@@ -1,21 +1,39 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { addCredits } from "@/lib/credits";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+
+function getPlanFromAmount(amount?: number | null) {
+  if (amount === 2900) {
+    return {
+      plan: "creator",
+      credits: 500,
+    };
+  }
+
+  if (amount === 9900) {
+    return {
+      plan: "studio",
+      credits: 3000,
+    };
+  }
+
+  return {
+    plan: "free",
+    credits: 25,
+  };
+}
 
 export async function POST(request: Request) {
   const body = await request.text();
   const signature = request.headers.get("stripe-signature");
 
-  if (!signature) {
-    return NextResponse.json({ error: "Missing signature" }, { status: 400 });
-  }
-
-  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+  if (!signature || !process.env.STRIPE_WEBHOOK_SECRET) {
     return NextResponse.json(
-      { error: "Missing STRIPE_WEBHOOK_SECRET" },
-      { status: 500 }
+      { error: "Missing Stripe signature or webhook secret" },
+      { status: 400 }
     );
   }
 
@@ -28,29 +46,49 @@ export async function POST(request: Request) {
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch {
-    return NextResponse.json({ error: "Bad signature" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid webhook signature" },
+      { status: 400 }
+    );
   }
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
 
-    await supabaseAdmin.from("subscriptions").insert({
-      user_id: session.metadata?.user_id,
-      stripe_customer_id: session.customer?.toString(),
-      stripe_subscription_id: session.subscription?.toString(),
-      plan: session.metadata?.plan,
-      status: "active",
-    });
+    const userId = session.metadata?.userId;
+    const customerId = String(session.customer || "");
+    const subscriptionId = String(session.subscription || "");
+
+    if (userId && subscriptionId) {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+
+      const firstItem = subscription.items.data[0];
+      const amount = firstItem?.price?.unit_amount;
+      const { plan, credits } = getPlanFromAmount(amount);
+
+      await supabaseAdmin.from("subscriptions").upsert(
+        {
+          user_id: userId,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscriptionId,
+          status: subscription.status,
+          plan,
+          credits,
+          current_period_end: new Date(
+            subscription.current_period_end * 1000
+          ).toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id",
+        }
+      );
+
+      await addCredits(userId, credits);
+    }
   }
 
-  if (event.type === "customer.subscription.deleted") {
-    const subscription = event.data.object as Stripe.Subscription;
-
-    await supabaseAdmin
-      .from("subscriptions")
-      .update({ status: "canceled" })
-      .eq("stripe_subscription_id", subscription.id);
-  }
-
-  return NextResponse.json({ received: true });
+  return NextResponse.json({
+    received: true,
+  });
 }

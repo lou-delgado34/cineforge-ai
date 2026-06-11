@@ -8,6 +8,7 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const priceId = body.priceId as string;
+    const userId = body.userId as string;
 
     if (!process.env.STRIPE_SECRET_KEY) {
       return NextResponse.json(
@@ -37,8 +38,11 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
+      metadata: {
+        userId: userId || "",
+      },
       success_url: `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/pricing`,
+      cancel_url: `${origin}/billing/cancel`,
     });
 
     return NextResponse.json({
