@@ -40,21 +40,36 @@ export async function POST(request: Request) {
     const amount = firstItem?.price?.unit_amount;
     const { plan, credits } = getPlanFromAmount(amount);
 
-    await supabaseAdmin.from("subscriptions").upsert(
-      {
-        user_id: body.userId,
-        stripe_customer_id: customerId,
-        stripe_subscription_id: subscriptionId,
-        status: subscription.status,
-        plan,
-        credits,
-        current_period_end: null,
-        updated_at: new Date().toISOString(),
-      },
-      {
-        onConflict: "user_id",
-      }
-    );
+    const { data: savedSubscription, error: subscriptionError } =
+      await supabaseAdmin
+        .from("subscriptions")
+        .upsert(
+          {
+            user_id: body.userId,
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscriptionId,
+            status: subscription.status,
+            plan,
+            credits,
+            current_period_end: null,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "user_id",
+          }
+        )
+        .select()
+        .single();
+
+    if (subscriptionError) {
+      return NextResponse.json(
+        {
+          error: subscriptionError.message,
+          details: subscriptionError,
+        },
+        { status: 500 }
+      );
+    }
 
     await addCredits(body.userId, credits);
 
@@ -63,6 +78,7 @@ export async function POST(request: Request) {
       plan,
       credits,
       status: subscription.status,
+      subscription: savedSubscription,
     });
   } catch (error) {
     return NextResponse.json(
