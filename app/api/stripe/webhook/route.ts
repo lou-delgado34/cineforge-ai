@@ -7,23 +7,26 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
 function getPlanFromAmount(amount?: number | null) {
   if (amount === 2900) {
-    return {
-      plan: "creator",
-      credits: 500,
-    };
+    return { plan: "creator", credits: 500 };
   }
 
   if (amount === 9900) {
-    return {
-      plan: "studio",
-      credits: 3000,
-    };
+    return { plan: "studio", credits: 3000 };
   }
 
-  return {
-    plan: "free",
-    credits: 25,
+  return { plan: "free", credits: 25 };
+}
+
+function getCurrentPeriodEnd(subscription: Stripe.Subscription) {
+  const subscriptionWithPeriod = subscription as Stripe.Subscription & {
+    current_period_end?: number;
   };
+
+  if (subscriptionWithPeriod.current_period_end) {
+    return new Date(subscriptionWithPeriod.current_period_end * 1000).toISOString();
+  }
+
+  return null;
 }
 
 export async function POST(request: Request) {
@@ -74,9 +77,7 @@ export async function POST(request: Request) {
           status: subscription.status,
           plan,
           credits,
-          current_period_end: new Date(
-            subscription.current_period_end * 1000
-          ).toISOString(),
+          current_period_end: getCurrentPeriodEnd(subscription),
           updated_at: new Date().toISOString(),
         },
         {
