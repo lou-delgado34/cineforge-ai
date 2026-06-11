@@ -1,9 +1,19 @@
 "use client";
 
+import { supabase } from "@/lib/supabase";
+
 export default function PricingPage() {
   async function subscribe(priceId: string) {
     if (!priceId) {
-      alert("Missing Stripe Price ID in .env.local");
+      alert("Missing Stripe Price ID");
+      return;
+    }
+
+    const { data } = await supabase.auth.getSession();
+
+    if (!data.session?.user) {
+      alert("Please login first.");
+      window.location.href = "/login";
       return;
     }
 
@@ -12,7 +22,10 @@ export default function PricingPage() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ priceId }),
+      body: JSON.stringify({
+        priceId,
+        userId: data.session.user.id,
+      }),
     });
 
     const result = await response.json();

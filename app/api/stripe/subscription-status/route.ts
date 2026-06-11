@@ -4,26 +4,33 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const userId = body.userId;
 
-    if (!userId) {
-      return NextResponse.json({ subscription: null });
+    if (!body.userId) {
+      return NextResponse.json(
+        { error: "Missing userId" },
+        { status: 400 }
+      );
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data: subscription } = await supabaseAdmin
       .from("subscriptions")
       .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
+      .eq("user_id", body.userId)
       .maybeSingle();
 
-    if (error) {
-      return NextResponse.json({ subscription: null });
-    }
-
-    return NextResponse.json({ subscription: data });
+    return NextResponse.json({
+      subscription: subscription || {
+        plan: "free",
+        status: "inactive",
+        stripe_customer_id: null,
+        stripe_subscription_id: null,
+        current_period_end: null,
+      },
+    });
   } catch {
-    return NextResponse.json({ subscription: null });
+    return NextResponse.json(
+      { error: "Subscription status failed." },
+      { status: 500 }
+    );
   }
 }
