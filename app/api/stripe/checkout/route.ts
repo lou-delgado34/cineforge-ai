@@ -39,8 +39,10 @@ export async function POST(request: Request) {
         },
       ],
       metadata: {
-        userId: userId || "",
-      },
+  userId: userId || "",
+},
+client_reference_id: userId || undefined,
+
       success_url: `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/billing/cancel`,
     });
