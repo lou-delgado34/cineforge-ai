@@ -5,13 +5,33 @@ import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { UserMenu } from "./user-menu";
 import { LogoutButton } from "./logout-button";
-import { getCredits } from "@/lib/credit-store";
+import { supabase } from "@/lib/supabase";
 
 export function AppHeader() {
-  const [credits, setCredits] = useState(100);
+  const [credits, setCredits] = useState(0);
 
   useEffect(() => {
-    setCredits(getCredits());
+    async function loadStatus() {
+      const { data } = await supabase.auth.getSession();
+
+      if (!data.session?.user) return;
+
+      const response = await fetch("/api/account/status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: data.session.user.id,
+        }),
+      });
+
+      const result = await response.json();
+
+      setCredits(result.credits ?? 0);
+    }
+
+    loadStatus();
   }, []);
 
   return (
