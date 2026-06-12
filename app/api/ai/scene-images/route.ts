@@ -9,21 +9,8 @@ type SceneInput = {
 };
 
 function getImageUrl(output: unknown) {
-  if (Array.isArray(output)) {
-    const first = output[0];
-
-    if (typeof first === "string") return first;
-
-    if (first && typeof first === "object" && "url" in first) {
-      const urlValue = (first as { url?: unknown }).url;
-      if (typeof urlValue === "string") return urlValue;
-    }
-
-    return String(first || "");
-  }
-
+  if (Array.isArray(output)) return String(output[0] || "");
   if (typeof output === "string") return output;
-
   return "";
 }
 
@@ -31,34 +18,25 @@ export async function POST(request: Request) {
   try {
     if (!process.env.REPLICATE_API_TOKEN) {
       return NextResponse.json(
-        { error: "Missing REPLICATE_API_TOKEN in Vercel environment variables." },
+        { error: "Missing REPLICATE_API_TOKEN in Vercel." },
         { status: 500 }
       );
+    }
+
+    const body = await request.json();
+    const scenes = body.scenes as SceneInput[];
+
+    if (!Array.isArray(scenes) || scenes.length === 0) {
+      return NextResponse.json({ error: "Missing scenes." }, { status: 400 });
     }
 
     const replicate = new Replicate({
       auth: process.env.REPLICATE_API_TOKEN,
     });
 
-    const body = await request.json();
-    const scenes = body.scenes as SceneInput[];
-
-    if (!Array.isArray(scenes) || scenes.length === 0) {
-      return NextResponse.json({ error: "Missing scenes array." }, { status: 400 });
-    }
-
     const generated = [];
 
     for (const scene of scenes) {
-      if (!scene.imagePrompt) {
-        generated.push({
-          ...scene,
-          imageUrl: "",
-          error: "Missing image prompt for this scene.",
-        });
-        continue;
-      }
-
       const output = await replicate.run("black-forest-labs/flux-schnell", {
         input: {
           prompt: scene.imagePrompt,
@@ -82,7 +60,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Scene images failed.",
+        error: error instanceof Error ? error.message : "Image generation failed.",
       },
       { status: 500 }
     );
