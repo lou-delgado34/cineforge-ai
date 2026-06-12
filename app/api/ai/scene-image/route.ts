@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import Replicate from "replicate";
 
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
-});
-
 function getImageUrl(output: unknown) {
   if (Array.isArray(output)) return String(output[0] || "");
   if (typeof output === "string") return output;
@@ -13,21 +9,25 @@ function getImageUrl(output: unknown) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-
     if (!process.env.REPLICATE_API_TOKEN) {
       return NextResponse.json(
-        { error: "Missing REPLICATE_API_TOKEN" },
+        { error: "Missing REPLICATE_API_TOKEN in Vercel." },
         { status: 500 }
       );
     }
 
+    const body = await request.json();
+
     if (!body.imagePrompt) {
       return NextResponse.json(
-        { error: "Missing imagePrompt" },
+        { error: "Missing imagePrompt." },
         { status: 400 }
       );
     }
+
+    const replicate = new Replicate({
+      auth: process.env.REPLICATE_API_TOKEN,
+    });
 
     const output = await replicate.run("black-forest-labs/flux-schnell", {
       input: {
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Scene image failed",
+        error: error instanceof Error ? error.message : "Scene image failed.",
       },
       { status: 500 }
     );
