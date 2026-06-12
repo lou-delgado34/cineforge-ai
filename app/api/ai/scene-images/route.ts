@@ -6,11 +6,23 @@ type SceneInput = {
   title: string;
   description: string;
   imagePrompt: string;
+  cameraMotion?: string;
 };
 
 function getImageUrl(output: unknown) {
-  if (Array.isArray(output)) return String(output[0] || "");
+  if (Array.isArray(output)) {
+    const first = output[0];
+
+    if (typeof first === "string") return first;
+
+    if (first && typeof first === "object" && "url" in first) {
+      const value = (first as { url?: unknown }).url;
+      if (typeof value === "string") return value;
+    }
+  }
+
   if (typeof output === "string") return output;
+
   return "";
 }
 
@@ -27,7 +39,10 @@ export async function POST(request: Request) {
     const scenes = body.scenes as SceneInput[];
 
     if (!Array.isArray(scenes) || scenes.length === 0) {
-      return NextResponse.json({ error: "Missing scenes." }, { status: 400 });
+      return NextResponse.json(
+        { error: "No scenes were sent to the image generator." },
+        { status: 400 }
+      );
     }
 
     const replicate = new Replicate({
@@ -40,10 +55,12 @@ export async function POST(request: Request) {
       const output = await replicate.run("black-forest-labs/flux-schnell", {
         input: {
           prompt: scene.imagePrompt,
+          go_fast: true,
+          megapixels: "1",
           num_outputs: 1,
           aspect_ratio: "16:9",
           output_format: "webp",
-          output_quality: 90,
+          output_quality: 80,
         },
       });
 
