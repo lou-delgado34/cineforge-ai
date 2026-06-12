@@ -9,8 +9,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    if (!body.prompt) {
-      return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
+    if (!body.script) {
+      return NextResponse.json({ error: "Missing script" }, { status: 400 });
     }
 
     const response = await openai.chat.completions.create({
@@ -19,22 +19,37 @@ export async function POST(request: Request) {
         {
           role: "system",
           content:
-            "You write short cinematic video scripts. Keep scripts clear, visual, and easy to turn into scenes.",
+            "Split scripts into 5 cinematic scenes. Return only valid JSON. No markdown.",
         },
         {
           role: "user",
-          content: `Write a 45 second cinematic video script for this idea: ${body.prompt}`,
+          content: `
+Create 5 scenes from this script.
+
+Each scene must have:
+sceneNumber
+title
+description
+imagePrompt
+cameraMotion
+
+Script:
+${body.script}
+          `,
         },
       ],
+      response_format: { type: "json_object" },
     });
+
+    const text = response.choices[0]?.message?.content || "{}";
 
     return NextResponse.json({
       success: true,
-      script: response.choices[0]?.message?.content || "",
+      result: JSON.parse(text),
     });
   } catch {
     return NextResponse.json(
-      { error: "Script generation failed" },
+      { error: "Scene generation failed" },
       { status: 500 }
     );
   }
