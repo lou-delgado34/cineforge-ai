@@ -9,6 +9,7 @@ type Scene = {
   imagePrompt: string;
   cameraMotion?: string;
   imageUrl?: string;
+  error?: string;
 };
 
 export default function AiPipelinePage() {
@@ -16,8 +17,10 @@ export default function AiPipelinePage() {
   const [script, setScript] = useState("");
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [loading, setLoading] = useState("");
+  const [error, setError] = useState("");
 
   async function generateScript() {
+    setError("");
     setLoading("Generating script...");
 
     const response = await fetch("/api/ai/script", {
@@ -29,11 +32,19 @@ export default function AiPipelinePage() {
     });
 
     const result = await response.json();
+
+    if (!response.ok) {
+      setError(result.error || "Script generation failed.");
+      setLoading("");
+      return;
+    }
+
     setScript(result.script || "");
     setLoading("");
   }
 
   async function generateScenes() {
+    setError("");
     setLoading("Generating scenes...");
 
     const response = await fetch("/api/ai/scenes", {
@@ -45,6 +56,13 @@ export default function AiPipelinePage() {
     });
 
     const result = await response.json();
+
+    if (!response.ok) {
+      setError(result.error || "Scene generation failed.");
+      setLoading("");
+      return;
+    }
+
     const sceneList = result.result?.scenes || result.result?.data || [];
 
     setScenes(sceneList);
@@ -52,6 +70,7 @@ export default function AiPipelinePage() {
   }
 
   async function generateImages() {
+    setError("");
     setLoading("Generating scene images...");
 
     const response = await fetch("/api/ai/scene-images", {
@@ -63,6 +82,13 @@ export default function AiPipelinePage() {
     });
 
     const result = await response.json();
+
+    if (!response.ok) {
+      setError(result.error || "Image generation failed.");
+      setLoading("");
+      return;
+    }
+
     setScenes(result.scenes || scenes);
     setLoading("");
   }
@@ -109,6 +135,12 @@ export default function AiPipelinePage() {
         </div>
 
         {loading && <p className="mt-4 text-green-400">{loading}</p>}
+
+        {error && (
+          <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+            {error}
+          </div>
+        )}
       </section>
 
       {script && (
@@ -128,12 +160,20 @@ export default function AiPipelinePage() {
               <p className="text-sm text-white/40">
                 Scene {scene.sceneNumber}
               </p>
+
               <h3 className="mt-2 text-xl font-bold">{scene.title}</h3>
+
               <p className="mt-3 text-white/60">{scene.description}</p>
 
               <p className="mt-4 rounded-xl bg-black p-3 text-sm text-white/50">
                 {scene.imagePrompt}
               </p>
+
+              {scene.error && (
+                <p className="mt-3 rounded-xl bg-red-500/10 p-3 text-sm text-red-300">
+                  {scene.error}
+                </p>
+              )}
 
               {scene.imageUrl && (
                 <img
