@@ -19,15 +19,16 @@ export async function POST(request: Request) {
           scenes: body.scenes || [],
           updated_at: new Date().toISOString(),
         },
-        {
-          onConflict: "user_id",
-        }
+        { onConflict: "user_id" }
       )
       .select()
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: error.message, details: error },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true, project: data });
