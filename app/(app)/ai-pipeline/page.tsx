@@ -44,6 +44,68 @@ export default function AiPipelinePage() {
     );
   }, [prompt, script, scenes]);
 
+  function buildLockedImagePrompt(scene: Scene) {
+    return `
+Create one cinematic 16:9 image for this exact video project.
+
+MAIN PROJECT PROMPT:
+${prompt}
+
+SCENE NUMBER:
+${scene.sceneNumber}
+
+SCENE TITLE:
+${scene.title}
+
+SCENE DESCRIPTION:
+${scene.description}
+
+SCENE IMAGE PROMPT:
+${scene.imagePrompt}
+
+STRICT RULES:
+- Match this scene only.
+- Do not add unrelated characters.
+- Do not change the subject.
+- Do not change the setting.
+- Keep the same visual style across all scenes.
+- Cinematic lighting.
+- High detail.
+- Wide 16:9 composition.
+- No text, no logos, no watermark.
+`.trim();
+  }
+
+  function buildLockedVideoPrompt(scene: Scene) {
+    return `
+Animate this exact image into a short cinematic video clip.
+
+MAIN PROJECT PROMPT:
+${prompt}
+
+SCENE NUMBER:
+${scene.sceneNumber}
+
+SCENE TITLE:
+${scene.title}
+
+SCENE DESCRIPTION:
+${scene.description}
+
+MOTION:
+${scene.cameraMotion || "smooth cinematic camera movement"}
+
+STRICT RULES:
+- Keep the same subject from the image.
+- Keep the same setting from the image.
+- Do not add unrelated characters.
+- Do not change the character identity.
+- Do not change the scene.
+- Use subtle cinematic motion.
+- 5 second video.
+`.trim();
+  }
+
   async function generateScript() {
     setError("");
     setLoading("Generating script...");
@@ -109,7 +171,9 @@ export default function AiPipelinePage() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ imagePrompt: scene.imagePrompt }),
+      body: JSON.stringify({
+        imagePrompt: buildLockedImagePrompt(scene),
+      }),
     });
 
     const result = await response.json();
@@ -149,10 +213,6 @@ export default function AiPipelinePage() {
       return;
     }
 
-    const videoPrompt =
-      scene.cameraMotion ||
-      `Create a smooth cinematic 6 second camera movement from this scene: ${scene.description}`;
-
     const response = await fetch("/api/ai/scene-video", {
       method: "POST",
       headers: {
@@ -160,7 +220,7 @@ export default function AiPipelinePage() {
       },
       body: JSON.stringify({
         imageUrl: scene.imageUrl,
-        prompt: videoPrompt,
+        prompt: buildLockedVideoPrompt(scene),
       }),
     });
 
@@ -203,7 +263,7 @@ export default function AiPipelinePage() {
         <textarea
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
-          placeholder="Example: A cyberpunk motorcycle race through neon Tokyo"
+          placeholder="Example: A futuristic drone flying over a glowing desert city at sunset"
           className="min-h-36 w-full rounded-xl border border-white/10 bg-black p-4 text-white outline-none"
         />
 
