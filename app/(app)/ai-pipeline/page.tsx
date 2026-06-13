@@ -9,6 +9,7 @@ type Scene = {
   imagePrompt: string;
   cameraMotion?: string;
   imageUrl?: string;
+  videoUrl?: string;
   error?: string;
 };
 
@@ -114,14 +115,6 @@ export default function AiPipelinePage() {
     const result = await response.json();
 
     if (!response.ok) {
-      setScenes((currentScenes) =>
-        currentScenes.map((item) =>
-          item.sceneNumber === sceneNumber
-            ? { ...item, error: result.error || "Image generation failed." }
-            : item
-        )
-      );
-
       setError(result.error || "Image generation failed.");
       setLoading("");
       return;
@@ -131,6 +124,58 @@ export default function AiPipelinePage() {
       currentScenes.map((item) =>
         item.sceneNumber === sceneNumber
           ? { ...item, imageUrl: result.imageUrl, error: "" }
+          : item
+      )
+    );
+
+    setLoading("");
+  }
+
+  async function generateSingleVideo(sceneNumber: number) {
+    setError("");
+    setLoading(`Generating video for Scene ${sceneNumber}...`);
+
+    const scene = scenes.find((item) => item.sceneNumber === sceneNumber);
+
+    if (!scene) {
+      setError("Scene not found.");
+      setLoading("");
+      return;
+    }
+
+    if (!scene.imageUrl) {
+      setError("Generate an image first.");
+      setLoading("");
+      return;
+    }
+
+    const videoPrompt =
+      scene.cameraMotion ||
+      `Create a smooth cinematic 6 second camera movement from this scene: ${scene.description}`;
+
+    const response = await fetch("/api/ai/scene-video", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        imageUrl: scene.imageUrl,
+        prompt: videoPrompt,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      setError(result.error || "Video generation failed.");
+      setLoading("");
+      return;
+    }
+
+    setScenes((currentScenes) =>
+      currentScenes.map((item) =>
+        item.sceneNumber === sceneNumber
+          ? { ...item, videoUrl: result.videoUrl, error: "" }
           : item
       )
     );
@@ -151,7 +196,7 @@ export default function AiPipelinePage() {
     <main className="p-6 text-white">
       <h1 className="text-4xl font-bold">AI Generation Pipeline</h1>
       <p className="mt-2 text-white/60">
-        Build a video from prompt to script, scenes, and images.
+        Build a video from prompt to script, scenes, images, and video clips.
       </p>
 
       <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
@@ -222,13 +267,23 @@ export default function AiPipelinePage() {
                 {scene.imagePrompt}
               </p>
 
-              <button
-                onClick={() => generateSingleImage(scene.sceneNumber)}
-                disabled={!!loading}
-                className="mt-4 rounded-xl bg-white px-5 py-3 font-semibold text-black disabled:opacity-50"
-              >
-                {scene.imageUrl ? "Regenerate Image" : "Generate Scene Image"}
-              </button>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  onClick={() => generateSingleImage(scene.sceneNumber)}
+                  disabled={!!loading}
+                  className="rounded-xl bg-white px-5 py-3 font-semibold text-black disabled:opacity-50"
+                >
+                  {scene.imageUrl ? "Regenerate Image" : "Generate Image"}
+                </button>
+
+                <button
+                  onClick={() => generateSingleVideo(scene.sceneNumber)}
+                  disabled={!scene.imageUrl || !!loading}
+                  className="rounded-xl bg-white px-5 py-3 font-semibold text-black disabled:opacity-50"
+                >
+                  {scene.videoUrl ? "Regenerate Video" : "Generate Video"}
+                </button>
+              </div>
 
               {scene.error && (
                 <p className="mt-3 rounded-xl bg-red-500/10 p-3 text-sm text-red-300">
@@ -241,6 +296,14 @@ export default function AiPipelinePage() {
                   src={scene.imageUrl}
                   alt={scene.title}
                   className="mt-4 rounded-xl border border-white/10"
+                />
+              )}
+
+              {scene.videoUrl && (
+                <video
+                  src={scene.videoUrl}
+                  controls
+                  className="mt-4 w-full rounded-xl border border-white/10"
                 />
               )}
             </div>
