@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 type Scene = {
   sceneNumber: number;
@@ -13,36 +14,63 @@ type Scene = {
   error?: string;
 };
 
-const STORAGE_KEY = "cineforge_ai_pipeline_draft";
-
 export default function AiPipelinePage() {
+  const [userId, setUserId] = useState("");
   const [prompt, setPrompt] = useState("");
   const [script, setScript] = useState("");
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+  async function loadProject() {
+    const { data } = await supabase.auth.getSession();
+    const user = data.session?.user;
 
-    if (saved) {
-      const data = JSON.parse(saved);
-      setPrompt(data.prompt || "");
-      setScript(data.script || "");
-      setScenes(data.scenes || []);
+    if (!user) return;
+
+    setUserId(user.id);
+
+    const response = await fetch("/api/ai-pipeline/load", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ userId: user.id }),
+    });
+
+    const result = await response.json();
+
+    if (result.project) {
+      setPrompt(result.project.prompt || "");
+      setScript(result.project.script || "");
+      setScenes(result.project.scenes || []);
     }
-  }, []);
+  }
+
+  async function saveProject(nextData?: {
+    prompt?: string;
+    script?: string;
+    scenes?: Scene[];
+  }) {
+    if (!userId) return;
+
+    await fetch("/api/ai-pipeline/save", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId,
+        prompt: nextData?.prompt ?? prompt,
+        script: nextData?.script ?? script,
+        scenes: nextData?.scenes ?? scenes,
+      }),
+    });
+  }
 
   useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        prompt,
-        script,
-        scenes,
-      })
-    );
-  }, [prompt, script, scenes]);
+    loadProject();
+  }, []);
 
   function buildLockedImagePrompt(scene: Scene) {
     return `
@@ -126,7 +154,9 @@ STRICT RULES:
       return;
     }
 
-    setScript(result.script || "");
+    const nextScript = result.script || "";
+    setScript(nextScript);
+    await saveProject({ script: nextScript });
     setLoading("");
   }
 
@@ -150,7 +180,9 @@ STRICT RULES:
       return;
     }
 
-    setScenes(result.result?.scenes || result.result?.data || []);
+    const nextScenes = result.result?.scenes || result.result?.data || [];
+    setScenes(nextScenes);
+    await saveProject({ scenes: nextScenes });
     setLoading("");
   }
 
@@ -184,14 +216,14 @@ STRICT RULES:
       return;
     }
 
-    setScenes((currentScenes) =>
-      currentScenes.map((item) =>
-        item.sceneNumber === sceneNumber
-          ? { ...item, imageUrl: result.imageUrl, error: "" }
-          : item
-      )
+    const nextScenes = scenes.map((item) =>
+      item.sceneNumber === sceneNumber
+        ? { ...item, imageUrl: result.imageUrl, error: "" }
+        : item
     );
 
+    setScenes(nextScenes);
+    await saveProject({ scenes: nextScenes });
     setLoading("");
   }
 
@@ -232,24 +264,43 @@ STRICT RULES:
       return;
     }
 
-    setScenes((currentScenes) =>
-      currentScenes.map((item) =>
-        item.sceneNumber === sceneNumber
-          ? { ...item, videoUrl: result.videoUrl, error: "" }
-          : item
-      )
+    const nextScenes = scenes.map((item) =>
+      item.sceneNumber === sceneNumber
+        ? { ...item, videoUrl: result.videoUrl, error: "" }
+        : item
     );
 
+    setScenes(nextScenes);
+    await saveProject({ scenes: nextScenes });
     setLoading("");
   }
 
-  function clearDraft() {
-    localStorage.removeItem(STORAGE_KEY);
+  async function clearDraft() {
     setPrompt("");
     setScript("");
     setScenes([]);
     setError("");
     setLoading("");
+
+    if (userId) {
+      await fetch("/api/ai-pipeline/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId,
+          prompt: "",
+          script: "",
+          scenes: [],
+        }),
+      });
+    }
+  }
+
+  async function updatePrompt(value: string) {
+    setPrompt(value);
+    await saveProject({ prompt: value });
   }
 
   return (
@@ -263,6 +314,7 @@ STRICT RULES:
         <textarea
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
+          onBlur={(event) => updatePrompt(event.target.value)}
           placeholder="Example: A futuristic drone flying over a glowing desert city at sunset"
           className="min-h-36 w-full rounded-xl border border-white/10 bg-black p-4 text-white outline-none"
         />
