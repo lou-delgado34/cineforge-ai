@@ -19,6 +19,8 @@ export default function AiPipelinePage() {
   const [prompt, setPrompt] = useState("");
   const [script, setScript] = useState("");
   const [scenes, setScenes] = useState<Scene[]>([]);
+  const [narration, setNarration] = useState("");
+  const [audioUrl, setAudioUrl] = useState("");
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
 
@@ -29,43 +31,6 @@ export default function AiPipelinePage() {
     if (!user) return;
 
     setUserId(user.id);
-
-    const response = await fetch("/api/ai-pipeline/load", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ userId: user.id }),
-    });
-
-    const result = await response.json();
-
-    if (result.project) {
-      setPrompt(result.project.prompt || "");
-      setScript(result.project.script || "");
-      setScenes(result.project.scenes || []);
-    }
-  }
-
-  async function saveProject(nextData?: {
-    prompt?: string;
-    script?: string;
-    scenes?: Scene[];
-  }) {
-    if (!userId) return;
-
-    await fetch("/api/ai-pipeline/save", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userId,
-        prompt: nextData?.prompt ?? prompt,
-        script: nextData?.script ?? script,
-        scenes: nextData?.scenes ?? scenes,
-      }),
-    });
   }
 
   useEffect(() => {
@@ -154,9 +119,8 @@ STRICT RULES:
       return;
     }
 
-    const nextScript = result.script || "";
-    setScript(nextScript);
-    await saveProject({ script: nextScript });
+    setScript(result.script || "");
+    setNarration(result.script || "");
     setLoading("");
   }
 
@@ -180,9 +144,7 @@ STRICT RULES:
       return;
     }
 
-    const nextScenes = result.result?.scenes || result.result?.data || [];
-    setScenes(nextScenes);
-    await saveProject({ scenes: nextScenes });
+    setScenes(result.result?.scenes || result.result?.data || []);
     setLoading("");
   }
 
@@ -216,14 +178,14 @@ STRICT RULES:
       return;
     }
 
-    const nextScenes = scenes.map((item) =>
-      item.sceneNumber === sceneNumber
-        ? { ...item, imageUrl: result.imageUrl, error: "" }
-        : item
+    setScenes((currentScenes) =>
+      currentScenes.map((item) =>
+        item.sceneNumber === sceneNumber
+          ? { ...item, imageUrl: result.imageUrl, error: "" }
+          : item
+      )
     );
 
-    setScenes(nextScenes);
-    await saveProject({ scenes: nextScenes });
     setLoading("");
   }
 
@@ -264,57 +226,72 @@ STRICT RULES:
       return;
     }
 
-    const nextScenes = scenes.map((item) =>
-      item.sceneNumber === sceneNumber
-        ? { ...item, videoUrl: result.videoUrl, error: "" }
-        : item
+    setScenes((currentScenes) =>
+      currentScenes.map((item) =>
+        item.sceneNumber === sceneNumber
+          ? { ...item, videoUrl: result.videoUrl, error: "" }
+          : item
+      )
     );
 
-    setScenes(nextScenes);
-    await saveProject({ scenes: nextScenes });
     setLoading("");
   }
 
-  async function clearDraft() {
+  async function generateVoice() {
+    setError("");
+    setLoading("Generating voice...");
+
+    const textToSpeak = narration || script;
+
+    if (!textToSpeak) {
+      setError("Add narration text first.");
+      setLoading("");
+      return;
+    }
+
+    const response = await fetch("/api/ai/voice", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text: textToSpeak,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      setError(result.error || "Voice generation failed.");
+      setLoading("");
+      return;
+    }
+
+    setAudioUrl(result.audioUrl || "");
+    setLoading("");
+  }
+
+  function clearDraft() {
     setPrompt("");
     setScript("");
     setScenes([]);
+    setNarration("");
+    setAudioUrl("");
     setError("");
     setLoading("");
-
-    if (userId) {
-      await fetch("/api/ai-pipeline/save", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId,
-          prompt: "",
-          script: "",
-          scenes: [],
-        }),
-      });
-    }
-  }
-
-  async function updatePrompt(value: string) {
-    setPrompt(value);
-    await saveProject({ prompt: value });
   }
 
   return (
     <main className="p-6 text-white">
       <h1 className="text-4xl font-bold">AI Generation Pipeline</h1>
       <p className="mt-2 text-white/60">
-        Build a video from prompt to script, scenes, images, and video clips.
+        Build a video from prompt to script, scenes, images, video clips, and voice.
       </p>
 
       <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
         <textarea
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
-          onBlur={(event) => updatePrompt(event.target.value)}
           placeholder="Example: A futuristic drone flying over a glowing desert city at sunset"
           className="min-h-36 w-full rounded-xl border border-white/10 bg-black p-4 text-white outline-none"
         />
@@ -357,6 +334,38 @@ STRICT RULES:
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
           <h2 className="text-2xl font-bold">Script</h2>
           <p className="mt-4 whitespace-pre-wrap text-white/70">{script}</p>
+        </section>
+      )}
+
+      {(script || narration) && (
+        <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+          <h2 className="text-2xl font-bold">Voice Generation</h2>
+          <p className="mt-2 text-white/60">
+            Edit the narration, then generate voice.
+          </p>
+
+          <textarea
+            value={narration}
+            onChange={(event) => setNarration(event.target.value)}
+            placeholder="Paste or edit narration here..."
+            className="mt-4 min-h-40 w-full rounded-xl border border-white/10 bg-black p-4 text-white outline-none"
+          />
+
+          <button
+            onClick={generateVoice}
+            disabled={!(narration || script) || !!loading}
+            className="mt-4 rounded-xl bg-white px-5 py-3 font-semibold text-black disabled:opacity-50"
+          >
+            {audioUrl ? "Regenerate Voice" : "Generate Voice"}
+          </button>
+
+          {audioUrl && (
+            <audio
+              src={audioUrl}
+              controls
+              className="mt-4 w-full"
+            />
+          )}
         </section>
       )}
 
