@@ -37,6 +37,40 @@ export default function AiPipelinePage() {
     loadProject();
   }, []);
 
+  function cleanVoiceScript(rawScript: string) {
+    return rawScript
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .filter((line) => !line.startsWith("**Title"))
+      .filter((line) => !line.startsWith("**["))
+      .filter((line) => !line.startsWith("["))
+      .filter((line) => !line.toLowerCase().includes("fade in"))
+      .filter((line) => !line.toLowerCase().includes("fade out"))
+      .filter((line) => !line.toLowerCase().includes("cut to"))
+      .filter((line) => !line.toLowerCase().includes("wide shot"))
+      .filter((line) => !line.toLowerCase().includes("medium shot"))
+      .filter((line) => !line.toLowerCase().includes("close-up"))
+      .filter((line) => !line.toLowerCase().includes("sfx"))
+      .filter((line) => !line.toLowerCase().startsWith("visual:"))
+      .filter((line) => !line.toLowerCase().startsWith("sound:"))
+      .filter((line) => !line.startsWith("*"))
+      .map((line) =>
+        line
+          .replace(/\*\*/g, "")
+          .replace(/\([^)]*\)/g, "")
+          .replace(/^GOKU:?/i, "")
+          .replace(/^VEGETA:?/i, "")
+          .replace(/^NARRATOR:?/i, "")
+          .replace(/^ANNOUNCER:?/i, "")
+          .replace(/^HOST:?/i, "")
+          .replace(/^VOICEOVER:?/i, "")
+          .trim()
+      )
+      .filter((line) => line.length > 0)
+      .join("\n\n");
+  }
+
   function buildLockedImagePrompt(scene: Scene) {
     return `
 Create one cinematic 16:9 image for this exact video project.
@@ -119,8 +153,10 @@ STRICT RULES:
       return;
     }
 
-    setScript(result.script || "");
-    setNarration(result.script || "");
+    const nextScript = result.script || "";
+
+    setScript(nextScript);
+    setNarration(cleanVoiceScript(nextScript));
     setLoading("");
   }
 
@@ -241,7 +277,7 @@ STRICT RULES:
     setError("");
     setLoading("Generating voice...");
 
-    const textToSpeak = narration || script;
+    const textToSpeak = narration || cleanVoiceScript(script);
 
     if (!textToSpeak) {
       setError("Add narration text first.");
@@ -341,13 +377,13 @@ STRICT RULES:
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
           <h2 className="text-2xl font-bold">Voice Generation</h2>
           <p className="mt-2 text-white/60">
-            Edit the narration, then generate voice.
+            This box now removes camera directions and keeps only spoken words.
           </p>
 
           <textarea
             value={narration}
             onChange={(event) => setNarration(event.target.value)}
-            placeholder="Paste or edit narration here..."
+            placeholder="Clean narration will appear here..."
             className="mt-4 min-h-40 w-full rounded-xl border border-white/10 bg-black p-4 text-white outline-none"
           />
 
@@ -359,13 +395,7 @@ STRICT RULES:
             {audioUrl ? "Regenerate Voice" : "Generate Voice"}
           </button>
 
-          {audioUrl && (
-            <audio
-              src={audioUrl}
-              controls
-              className="mt-4 w-full"
-            />
-          )}
+          {audioUrl && <audio src={audioUrl} controls className="mt-4 w-full" />}
         </section>
       )}
 
