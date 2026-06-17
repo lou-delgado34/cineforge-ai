@@ -48,6 +48,9 @@ const navItems = [
   { label: "Replicate Test", href: "/replicate-test", icon: TestTube },
   { label: "Video Storage Status", href: "/video-storage-status", icon: Video },
 
+  { label: "AI Pipeline", href: "/ai-pipeline", icon: Wand2 },
+  { label: "Render Final Movie", href: "/render-movie", icon: Clapperboard },
+
   { label: "Script Generator", href: "/script-generator", icon: PenLine },
   { label: "Image Prompt Generator", href: "/image-prompts", icon: Wand2 },
   { label: "Image Generator", href: "/image-generator", icon: Image },
